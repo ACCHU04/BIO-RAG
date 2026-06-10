@@ -1,0 +1,48 @@
+# Core LLM & Agent (Gemini)
+google-generativeai
+google-api-core
+langchain-google-genai
+pydantic-settings==2.3.0
+langgraph==0.1.19
+langchain==0.2.5
+langchain-community==0.2.5
+langchain-openai
+
+# Vector Store & Reranking
+chromadb==0.5.0
+sentence-transformers==3.0.0
+flashrank==0.2.9
+
+# Biomedical NLP
+spacy==3.7.5
+scispacy==0.5.4
+biopython==1.83
+
+# Document Processing
+pypdf==4.2.0
+unstructured==0.14.4
+tiktoken==0.7.0
+
+# External APIs
+requests==2.32.3
+httpx==0.27.0
+tavily-python==0.3.3
+
+# Backend API
+fastapi==0.111.0
+uvicorn==0.30.1
+pydantic==2.7.3
+reportlab>=4.1.0
+
+# Evaluation
+ragas==0.1.10
+datasets==2.19.2
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.0
+
+# Utilities
+python-dotenv==1.0.1
+loguru==0.7.2
+tqdm==4.66.4
+rich==13.7.1
