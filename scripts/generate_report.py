@@ -100,8 +100,10 @@ def _page_bg(canvas_obj, doc):
 
 
 def _cover_page_bg(canvas_obj, doc):
-    """Draw cover page background."""
+    """Draw cover page background with 3D university header and bands."""
     canvas_obj.saveState()
+    cx = PAGE_W / 2
+
     # Colored band at top
     canvas_obj.setFillColor(TEAL)
     canvas_obj.rect(0, PAGE_H - 8*mm, PAGE_W, 8*mm, stroke=0, fill=1)
@@ -110,12 +112,63 @@ def _cover_page_bg(canvas_obj, doc):
     canvas_obj.drawString(MARGIN_L, PAGE_H - 6*mm, "PG FINAL PROJECT  ·  DATA SCIENCE & BIOINFORMATICS")
     canvas_obj.drawRightString(PAGE_W - MARGIN_R, PAGE_H - 6*mm, datetime.now().strftime("%B %Y"))
 
+    # ── 3D Chanakya University header ──────────────────────────────────────
+    uni_y = PAGE_H - 20*mm
+    canvas_obj.setFont("Helvetica-Bold", 26)
+    # Shadow layer 1 (darkest, farthest)
+    canvas_obj.setFillColor(colors.HexColor("#004d44"))
+    canvas_obj.drawCentredString(cx + 2.0, uni_y - 2.0, "Chanakya University")
+    # Shadow layer 2 (mid)
+    canvas_obj.setFillColor(colors.HexColor("#006358"))
+    canvas_obj.drawCentredString(cx + 1.0, uni_y - 1.0, "Chanakya University")
+    # Main text layer
+    canvas_obj.setFillColor(TEAL)
+    canvas_obj.drawCentredString(cx, uni_y, "Chanakya University")
+
+    # School of Engineering
+    canvas_obj.setFont("Helvetica", 14)
+    canvas_obj.setFillColor(INK3)
+    canvas_obj.drawCentredString(cx, uni_y - 9*mm, "School of Engineering")
+
+    # Decorative line under school
+    canvas_obj.setStrokeColor(TEAL)
+    canvas_obj.setLineWidth(0.4)
+    canvas_obj.line(cx - 35*mm, uni_y - 14*mm, cx + 35*mm, uni_y - 14*mm)
+
+    # ── Student details ────────────────────────────────────────────────────
+    sd_y = uni_y - 22*mm
+    canvas_obj.setFont("Helvetica-Bold", 16)
+    canvas_obj.setFillColor(INK)
+    canvas_obj.drawCentredString(cx, sd_y, "Acchutha KS")
+    canvas_obj.setFont("Helvetica", 12)
+    canvas_obj.setFillColor(INK3)
+    canvas_obj.drawCentredString(cx, sd_y - 6*mm, "MCA Data Science")
+    canvas_obj.setFont("Helvetica", 11)
+    canvas_obj.setFillColor(INK4)
+    canvas_obj.drawCentredString(cx, sd_y - 11*mm, "25PG00004")
+
+    # ── Guidance ────────────────────────────────────────────────────────────
+    gd_y = sd_y - 18*mm
+    canvas_obj.setFont("Helvetica", 9)
+    canvas_obj.setFillColor(INK4)
+    canvas_obj.drawCentredString(cx, gd_y, "Under the Guidance of")
+    canvas_obj.setFont("Helvetica-Bold", 12)
+    canvas_obj.setFillColor(INK2)
+    canvas_obj.drawCentredString(cx, gd_y - 5*mm, "Deepak B")
+
+    # ── Teal separator line ─────────────────────────────────────────────────
+    sep_y = gd_y - 13*mm
+    canvas_obj.setStrokeColor(TEAL)
+    canvas_obj.setLineWidth(1.8)
+    canvas_obj.line(cx - 45*mm, sep_y, cx + 45*mm, sep_y)
+
     # Bottom band
     canvas_obj.setFillColor(INK)
     canvas_obj.rect(0, 0, PAGE_W, 12*mm, stroke=0, fill=1)
     canvas_obj.setFillColor(WHITE)
     canvas_obj.setFont("Helvetica", 7)
     canvas_obj.drawString(MARGIN_L, 5*mm, "Biomedical Agentic RAG  |  LangGraph  ·  ChromaDB  ·  Gemini")
+
     canvas_obj.restoreState()
 
 
@@ -219,13 +272,17 @@ def _info_box(story, title, items):
 
 # ── Cover Page ──────────────────────────────────────────────────────────────
 def build_cover(story):
-    story.append(Spacer(1, 32*mm))
+    # Push below canvas-drawn header elements
+    story.append(Spacer(1, 68*mm))
+
+    # ── BioRAG title block ──────────────────────────────────────────────────
     story.append(Paragraph("BioRAG", ST["cover_title"]))
     story.append(Paragraph("Biomedical Agentic Retrieval-Augmented Generation System", ST["cover_sub"]))
-    story.append(Spacer(1, 3*mm))
+    story.append(Spacer(1, 2*mm))
     story.append(HRFlowable(width="40%", thickness=1.5, color=TEAL, hAlign="CENTER"))
-    story.append(Spacer(1, 10*mm))
+    story.append(Spacer(1, 6*mm))
 
+    # ── Project metadata table ──────────────────────────────────────────────
     cover_data = [
         ["Project Type", "PG Final Project — Data Science & Bioinformatics"],
         ["LLM Backend", "Google Gemini (gemini-2.0-flash-lite)"],
@@ -251,6 +308,7 @@ def build_cover(story):
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
         ("BOX", (0, 0), (-1, -1), 0.5, CREAM2),
         ("LINEBELOW", (0, 0), (-1, -2), 0.5, CREAM2),
+        ("LINEABOVE", (0, 0), (-1, 0), 0.5, TEAL),
     ]))
     story.append(t)
     story.append(PageBreak())
