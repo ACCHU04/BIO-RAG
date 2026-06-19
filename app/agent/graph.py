@@ -59,18 +59,20 @@ class AgentState(TypedDict):
 
 # ── Node Functions ────────────────────────────────────────────────────────────
 
-def retrieve_node(state: AgentState) -> AgentState:
+def retrieve_node(state: AgentState) -> dict:
     """Retrieve and rerank chunks: vector search then FlashRank cross-encoder."""
     logger.info(f"[RETRIEVE] Query: {state['query'][:80]}")
     docs = retrieve_and_rerank(state["query"], initial_k=15, final_k=5)
-    state["retrieved_docs"] = docs
-    state["reasoning_steps"] = [
-        f"Retrieved {len(docs)} chunks (vector search + FlashRank reranked) from knowledge base."
-    ]
-    return state
+    return {
+        "retrieved_docs": docs,
+        "reasoning_steps": [
+            f"Retrieved {len(docs)} chunks (vector search + FlashRank reranked) from knowledge base."
+        ]
+    }
 
 
-def evaluate_node(state: AgentState) -> AgentState:
+
+def evaluate_node(state: AgentState) -> dict:
     """
     Evaluate whether retrieved docs are sufficient to answer the query,
     or if external biomedical API tools are needed.
@@ -98,20 +100,23 @@ Evaluate the retrieved information. Respond with ONLY a JSON object:
     response = llm.invoke([HumanMessage(content=prompt)])
     try:
         result = json.loads(response.content.strip().strip("```json").strip("```"))
-        state["evaluation"] = result.get("evaluation", "needs_tools")
-        state["reasoning_steps"] = [f"Evaluation: {result.get('evaluation')} — {result.get('reason')}"]
+        evaluation = result.get("evaluation", "needs_tools")
+        reasoning_step = f"Evaluation: {result.get('evaluation')} — {result.get('reason')}"
     except Exception:
-        state["evaluation"] = "needs_tools"
-        state["reasoning_steps"] = ["Evaluation parsing failed — defaulting to tool use."]
+        evaluation = "needs_tools"
+        reasoning_step = "Evaluation parsing failed — defaulting to tool use."
 
-    logger.info(f"[EVALUATE] Result: {state['evaluation']}")
-    return state
+    logger.info(f"[EVALUATE] Result: {evaluation}")
+    return {
+        "evaluation": evaluation,
+        "reasoning_steps": [reasoning_step]
+    }
 
 
-def self_correct_node(state: AgentState) -> AgentState:
+
+def self_correct_node(state: AgentState) -> dict:
     """Rephrase query and re-retrieve when initial retrieval is insufficient."""
     count = state.get("self_correction_count", 0) + 1
-    state["self_correction_count"] = count
 
     prompt = f"""The initial retrieval for this biomedical query was insufficient.
 Original query: {state['query']}
@@ -119,16 +124,20 @@ Rephrase it using biomedical terminology to improve retrieval. Return ONLY the r
 
     response = llm.invoke([HumanMessage(content=prompt)])
     new_query = response.content.strip()
-    state["reasoning_steps"] = [f"Self-correction #{count}: rephrased query to '{new_query[:100]}'"]
+    reasoning_step = f"Self-correction #{count}: rephrased query to '{new_query[:100]}'"
     logger.info(f"[SELF-CORRECT] Attempt {count}: {new_query[:80]}")
 
     docs = retrieve_and_rerank(new_query, initial_k=15, final_k=5)
-    state["retrieved_docs"] = docs
-    state["evaluation"] = "needs_tools" if docs else "insufficient"
-    return state
+    return {
+        "self_correction_count": count,
+        "retrieved_docs": docs,
+        "evaluation": "needs_tools" if docs else "insufficient",
+        "reasoning_steps": [reasoning_step]
+    }
 
 
-def tool_call_node(state: AgentState) -> AgentState:
+
+def tool_call_node(state: AgentState) -> dict:
     """Determine which biomedical APIs to call and execute them."""
     prompt = f"""Given this biomedical research query, extract the key entities.
 Query: {state['query']}
@@ -146,30 +155,38 @@ Return ONLY JSON:
         entities = {"genes": [], "diseases": [], "search_terms": [state["query"]]}
 
     steps = []
+    pubmed_results = []
+    uniprot_results = []
+    open_targets_results = []
 
     # PubMed search
     for term in entities.get("search_terms", [])[:2]:
         results = search_pubmed(term, max_results=3)
-        state["pubmed_results"] = results
+        pubmed_results.extend(results)
         steps.append(f"PubMed: fetched {len(results)} articles for '{term}'")
 
     # UniProt search
     for gene in entities.get("genes", [])[:2]:
         results = search_uniprot(gene)
-        state["uniprot_results"] = results
+        uniprot_results.extend(results)
         steps.append(f"UniProt: fetched {len(results)} protein entries for gene '{gene}'")
 
     # Open Targets search
     for disease in entities.get("diseases", [])[:1]:
         results = search_open_targets(disease)
-        state["open_targets_results"] = results
+        open_targets_results.extend(results)
         steps.append(f"Open Targets: fetched {len(results)} drug-gene associations for '{disease}'")
 
-    state["reasoning_steps"] = steps
-    return state
+    return {
+        "pubmed_results": pubmed_results,
+        "uniprot_results": uniprot_results,
+        "open_targets_results": open_targets_results,
+        "reasoning_steps": steps
+    }
 
 
-def synthesize_node(state: AgentState) -> AgentState:
+
+def synthesize_node(state: AgentState) -> dict:
     """Synthesize all evidence into a final grounded, token-optimized answer."""
     local_context = build_optimized_context(state.get("retrieved_docs", []), max_total_tokens=2000)
     pubmed_context = "\n".join([
@@ -198,7 +215,7 @@ Reasoning steps taken:
 Provide a comprehensive, grounded answer following the required format."""
 
     response = llm.invoke([SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user)])
-    state["final_answer"] = response.content
+    final_answer = response.content
 
     sources = list(set(
         [d.get("source", "") for d in state.get("retrieved_docs", [])] +
@@ -218,9 +235,15 @@ Provide a comprehensive, grounded answer following the required format."""
         if key not in seen_pmids:
             seen_pmids.add(key)
             deduped.append(s)
-    state["sources"] = [s for s in deduped if s]
+            
+    deduped_sources = [s for s in deduped if s]
     logger.success("[SYNTHESIZE] Final answer generated.")
-    return state
+    return {
+        "final_answer": final_answer,
+        "sources": deduped_sources,
+        "reasoning_steps": ["Synthesized final response from all retrieved evidence."]
+    }
+
 
 
 # ── Routing Logic ─────────────────────────────────────────────────────────────
@@ -280,6 +303,8 @@ def run_agent(query: str, offline: bool = False) -> Dict[str, Any]:
             "self_corrections": 0,
             "pubmed_count": 0,
             "local_docs_count": len(docs),
+            "pubmed_articles_used": 0,
+            "local_docs_used": len(docs),
             "retrieved_docs": docs,
         }
     
@@ -305,5 +330,8 @@ def run_agent(query: str, offline: bool = False) -> Dict[str, Any]:
         "self_corrections": result["self_correction_count"],
         "pubmed_count": len(result["pubmed_results"]),
         "local_docs_count": len(result["retrieved_docs"]),
+        "pubmed_articles_used": len(result["pubmed_results"]),
+        "local_docs_used": len(result["retrieved_docs"]),
         "retrieved_docs": result["retrieved_docs"],
     }
+
